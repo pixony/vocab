@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>词库浏览</title>
+<link rel="stylesheet" href="style.css">
+<style>
+/* Ogden 词云布局特效 */
+.ogden-cloud-wrap { padding: 8px 0; }
+.section-title {
+  font-size: 13px; font-weight: 700; color: var(--text-2);
+  text-transform: uppercase; letter-spacing: .8px;
+  margin: 20px 0 10px; display: flex; align-items: center; gap: 8px;
+}
+.section-title::after { content:''; flex:1; height:1px; background:var(--border); }
+
+/* 详情弹窗中的例句 */
+.ex-row { display:flex; align-items:flex-start; gap:8px; }
+.ex-row .ex-text { flex:1; line-height:1.65; }
+</style>
+</head>
+<body>
+
+<nav class="navbar">
+  <a href="index.html" class="nav-brand">📚 词汇站</a>
+  <ul class="nav-menu">
+    <li><a href="index.html">🏠 首页</a></li>
+    <li><a href="browse.html">📖 浏览</a></li>
+    <li><a href="study.html">🎯 学习</a></li>
+    <li><a href="stats.html">📊 统计</a></li>
+  </ul>
+  <div class="corpus-switcher" style="margin-left:auto">
+    <button class="corpus-btn" data-corpus="lc3000">LC3000</button>
+    <button class="corpus-btn" data-corpus="ogden">Ogden 850</button>
+  </div>
+</nav>
+
+<div class="container">
+  <div style="margin-bottom:20px">
+    <h1 style="font-size:24px;font-weight:800;margin-bottom:4px" id="pageTitle">单词浏览</h1>
+    <p style="font-size:14px;color:var(--text-2)" id="pageDesc">点击单词查看详情，支持朗读</p>
+  </div>
+
+  <!-- 筛选工具栏 -->
+  <div class="card" style="margin-bottom:20px">
+    <div class="card-body" style="padding:14px 18px">
+      <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center">
+        <div class="input-group" style="flex:1;min-width:200px">
+          <span class="input-icon">🔍</span>
+          <input type="text" class="input" id="qSearch" placeholder="搜索单词或释义…">
+        </div>
+        <select class="input" id="qPos" style="width:auto;min-width:120px">
+          <option value="">全部词性</option>
+          <option value="n">名词</option>
+          <option value="v">动词</option>
+          <option value="adj">形容词</option>
+          <option value="adv">副词</option>
+        </select>
+        <select class="input" id="qStatus" style="width:auto;min-width:130px">
+          <option value="">全部状态</option>
+          <option value="0">未学习</option>
+          <option value="1">学习中</option>
+          <option value="2">初步掌握</option>
+          <option value="3">较为熟悉</option>
+          <option value="4">已掌握</option>
+        </select>
+        <!-- Ogden 分类（仅 Ogden 模式显示）-->
+        <select class="input" id="qOgdenCat" style="width:auto;min-width:130px;display:none">
+          <option value="">全部分类</option>
+          <option value="operations">Operations 操作词</option>
+          <option value="things">Things 事物词</option>
+          <option value="qualities">Qualities 品质词</option>
+        </select>
+        <select class="input" id="qFreq" style="width:auto;min-width:120px">
+          <option value="">全部频率</option>
+          <option value="S1">S1 口语最高频</option>
+          <option value="W1">W1 书面最高频</option>
+          <option value="S2">S2</option>
+          <option value="W2">W2</option>
+        </select>
+        <button class="btn btn-ghost btn-sm" id="btnReset">重置</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Ogden 分类导航（仅 Ogden 模式）-->
+  <div id="ogdenNav" style="display:none;margin-bottom:18px">
+    <div class="cat-nav">
+      <button class="cat-chip active" data-cat="">全部 850</button>
+      <button class="cat-chip" data-cat="operations" style="border-color:#a16207;color:#a16207">⚙️ Operations 18</button>
+      <button class="cat-chip" data-cat="things" style="border-color:#166534;color:#166534">🏷️ Things 600</button>
+      <button class="cat-chip" data-cat="qualities" style="border-color:#9d174d;color:#9d174d">✨ Qualities 100</button>
+    </div>
+    <div id="ogdenStats" style="font-size:13px;color:var(--text-2);padding:6px 0"></div>
+  </div>
+
+  <!-- 词云区域（Ogden 视图）-->
+  <div id="wordCloud" class="card" style="display:none;margin-bottom:20px">
+    <div class="card-body ogden-cloud-wrap" id="cloudContent"></div>
+  </div>
+
+  <!-- 表格视图（LC3000）-->
+  <div id="tableView">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+      <span style="font-size:14px;color:var(--text-2)" id="countText">共 0 个结果</span>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-outline btn-sm" id="viewCloud" style="display:none">☁️ 词云视图</button>
+        <button class="btn btn-outline btn-sm" id="viewTable">📋 列表视图</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse" id="wordTable">
+          <thead>
+            <tr style="background:var(--bg)">
+              <th style="padding:12px 16px;text-align:left;font-size:13px;color:var(--text-2);font-weight:600;border-bottom:2px solid var(--border)">单词</th>
+              <th style="padding:12px 16px;text-align:left;font-size:13px;color:var(--text-2);font-weight:600;border-bottom:2px solid var(--border)">频率</th>
+              <th style="padding:12px 16px;text-align:left;font-size:13px;color:var(--text-2);font-weight:600;border-bottom:2px solid var(--border)">释义</th>
+              <th style="padding:12px 16px;text-align:left;font-size:13px;color:var(--text-2);font-weight:600;border-bottom:2px solid var(--border)">状态</th>
+              <th style="padding:12px 16px;text-align:left;font-size:13px;color:var(--text-2);font-weight:600;border-bottom:2px solid var(--border)">操作</th>
+            </tr>
+          </thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+      <div style="padding:12px 16px;border-top:1px solid var(--border);display:flex;justify-content:center" id="pager"></div>
+    </div>
+  </div>
+</div>
+
+<!-- 单词详情弹窗 -->
+<div class="modal-overlay" id="wordModal">
+  <div class="modal">
+    <div class="modal-head">
+      <div style="display:flex;align-items:center;gap:10px">
+        <span id="mWord" style="font-size:24px;font-weight:800;background:linear-gradient(135deg,var(--primary),var(--secondary));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text"></span>
+        <button class="speak-btn" id="mSpeakWord" title="朗读单词">🔊</button>
+      </div>
+      <button class="btn btn-ghost btn-sm" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:18px" id="mMeta"></div>
+      <div id="mMeanings"></div>
+      <div id="mSyns" style="margin-top:14px;padding-top:12px;border-top:1px dashed var(--border)"></div>
+    </div>
+  </div>
+</div>
+
+<div id="toast-container" class="toast-container"></div>
+<script src="ogden.js"></script>
+<script src="words.js"></script>
+<script src="utils.js"></script>
+<script>
+const PAGE = 30;
+let page = 1, filtered = [], allWords = [], isOgden = false;
+
+document.addEventListener('DOMContentLoaded', () => {
+  allWords  = getWordList();
+  isOgden   = ACTIVE_CORPUS === 'ogden';
+
+  if (isOgden) {
+    document.getElementById('pageTitle').textContent = "Ogden's Basic English 850";
+    document.getElementById('pageDesc').textContent  = '850 个核心词汇可视化浏览';
+    document.getElementById('qOgdenCat').style.display = '';
+    document.getElementById('ogdenNav').style.display  = '';
+    document.getElementById('wordCloud').style.display = '';
+    document.getElementById('viewCloud').style.display = '';
+    renderCloud(allWords);
+  }
+
+  filter();
+
+  // Ogden 分类导航
+  document.querySelectorAll('.cat-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      document.querySelectorAll('.cat-chip').forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+      document.getElementById('qOgdenCat').value = chip.dataset.cat || '';
+      filter();
+    });
+  });
+
+  ['qSearch','qPos','qStatus','qFreq','qOgdenCat'].forEach(id => {
+    document.getElementById(id)?.addEventListener('input', () => { page = 1; filter(); });
+  });
+  document.getElementById('btnReset').addEventListener('click', resetFilters);
+  document.getElementById('viewCloud').addEventListener('click', () => {
+    document.getElementById('wordCloud').style.display = '';
+    document.getElementById('tableView').style.display = 'none';
+  });
+  document.getElementById('viewTable').addEventListener('click', () => {
+    document.getElementById('wordCloud').style.display = 'none';
+    document.getElementById('tableView').style.display = '';
+  });
+
+  document.getElementById('wordModal').addEventListener('click', e => {
+    if (e.target === e.currentTarget) closeModal();
+  });
+});
+
+function filter() {
+  const q   = document.getElementById('qSearch').value.toLowerCase();
+  const pos = document.getElementById('qPos').value;
+  const st  = document.getElementById('qStatus').value;
+  const fr  = document.getElementById('qFreq').value;
+  const cat = document.getElementById('qOgdenCat')?.value || '';
+  const prg = Progress.all();
+
+  filtered = allWords.filter(w => {
+    if (q && !w.word.toLowerCase().includes(q) &&
+        !w.meanings?.some(m => m.definition.toLowerCase().includes(q))) return false;
+    if (pos && !w.pos?.toLowerCase().includes(pos)) return false;
+    if (fr  && !w.frequency?.includes(fr)) return false;
+    if (st  !== '' && SM2.masteryLevel(prg[String(w.id || w.word)]) !== +st) return false;
+    if (cat && w.ogdenCategory !== cat) return false;
+    return true;
+  });
+
+  document.getElementById('countText').textContent = `共 ${filtered.length} 个结果`;
+  renderTable();
+  if (isOgden) renderCloud(filtered);
+}
+
+function resetFilters() {
+  ['qSearch','qPos','qStatus','qFreq','qOgdenCat'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  document.querySelectorAll('.cat-chip').forEach(c => c.classList.toggle('active', c.dataset.cat === ''));
+  page = 1; filter();
+}
+
+// ── 词云渲染 ──
+function renderCloud(words) {
+  const catGroups = {};
+  words.forEach(w => {
+    const cat = w.ogdenCategory || 'other';
+    if (!catGroups[cat]) catGroups[cat] = [];
+    catGroups[cat].push(w);
+  });
+  const prg = Progress.all();
+  let html = '';
+  const order = ['operations','things','qualities','other'];
+  order.forEach(cat => {
+    if (!catGroups[cat]) return;
+    const info = OGDEN_CATEGORIES[cat] || { label: cat, bg:'#f1f5f9', color:'#475569' };
+    html += `<div class="section-title" style="color:${info.color}">${info.label} <span style="font-size:11px;font-weight:500;opacity:.7">${catGroups[cat].length} 词</span></div>`;
+    html += '<div class="word-cloud">';
+    catGroups[cat].forEach(w => {
+      const card = prg[String(w.id || w.word)];
+      const lv   = SM2.masteryLevel(card);
+      const cls  = lv >= 4 ? 'known' : lv > 0 ? 'learning' : 'new';
+      html += `<div class="word-pill ${cls}" onclick="openModal('${w.word.replace(/'/g,"\\'")}')">
+        <span>${w.word}</span>
+        <span class="pill-speak" onclick="event.stopPropagation();Speech.speak('${w.word}')">🔊</span>
+      </div>`;
+    });
+    html += '</div>';
+  });
+  document.getElementById('cloudContent').innerHTML = html;
+
+  // Ogden 统计
+  if (ACTIVE_CORPUS === 'ogden') {
+    const total = words.length;
+    const known = words.filter(w => SM2.masteryLevel(Progress.get(String(w.id || w.word))) >= 3).length;
+    document.getElementById('ogdenStats').textContent = `已掌握 ${known} / ${total} 个`;
+  }
+}
+
+// ── 表格渲染 ──
+function renderTable() {
+  const total = Math.ceil(filtered.length / PAGE);
+  if (page > total && total > 0) page = total;
+  const slice = filtered.slice((page-1)*PAGE, page*PAGE);
+  const prg   = Progress.all();
+
+  let html = '';
+  slice.forEach(w => {
+    const card = prg[String(w.id || w.word)];
+    const lv   = SM2.masteryLevel(card);
+    const def1 = w.meanings?.[0]?.definition || '';
+    const zh   = def1.includes(' | ') ? def1.split(' | ')[0] : def1;
+    const lvLabel = SM2.masteryLabel(lv);
+    const lvColor = SM2.masteryColor(lv);
+    const ogCat = w.ogdenCategory ? OGDEN_CATEGORIES[w.ogdenCategory] : null;
+
+    html += `<tr style="border-bottom:1px solid var(--border-light);cursor:pointer" onclick="openModal('${w.word.replace(/'/g,"\\'")}')">
+      <td style="padding:12px 16px">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="font-size:16px;font-weight:700">${w.word}</span>
+          <button class="speak-btn" onclick="event.stopPropagation();Speech.speak('${w.word}')" title="朗读">🔊</button>
+          ${ogCat ? `<span class="badge" style="background:${ogCat.bg};color:${ogCat.color};font-size:10px">${ogCat.label}</span>` : ''}
+        </div>
+        <div style="font-size:12px;color:var(--text-3)">${w.phonetic ? '/'+w.phonetic+'/' : ''}</div>
+      </td>
+      <td style="padding:12px 16px">${freqTagsHtml(w.frequency)}</td>
+      <td style="padding:12px 16px">
+        <span class="pos-tag" style="margin-right:6px">${w.pos||''}</span>
+        <span style="font-size:13px;color:var(--text-2)">${zh.length>40?zh.slice(0,40)+'…':zh}</span>
+      </td>
+      <td style="padding:12px 16px">
+        <span style="display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:600;color:${lvColor}">
+          <span style="width:7px;height:7px;border-radius:50%;background:${lvColor}"></span>${lvLabel}
+        </span>
+      </td>
+      <td style="padding:12px 16px">
+        <a href="study.html?word=${encodeURIComponent(w.word)}" class="btn btn-outline btn-sm" onclick="event.stopPropagation()">练习</a>
+      </td>
+    </tr>`;
+  });
+
+  document.getElementById('tbody').innerHTML = html || `<tr><td colspan="5" style="text-align:center;padding:40px;color:var(--text-3)">没有符合条件的单词</td></tr>`;
+  renderPager(total);
+}
+
+function renderPager(total) {
+  if (total <= 1) { document.getElementById('pager').innerHTML=''; return; }
+  let h = `<button class="btn btn-ghost btn-sm" onclick="goPage(${page-1})" ${page===1?'disabled':''}>‹</button>`;
+  for (let i=1;i<=total;i++) {
+    if (i===1||i===total||Math.abs(i-page)<=2) h += `<button class="btn btn-sm ${i===page?'btn-primary':'btn-ghost'}" onclick="goPage(${i})">${i}</button>`;
+    else if (Math.abs(i-page)===3) h += `<span style="padding:0 4px;color:var(--text-3)">…</span>`;
+  }
+  h += `<button class="btn btn-ghost btn-sm" onclick="goPage(${page+1})" ${page===total?'disabled':''}>›</button>`;
+  document.getElementById('pager').innerHTML = h;
+}
+
+function goPage(p) { page=p; renderTable(); scrollTo({top:0,behavior:'smooth'}); }
+
+// ── 单词详情弹窗 ──
+function openModal(word) {
+  const w = allWords.find(e => e.word.toLowerCase() === word.toLowerCase());
+  if (!w) return;
+  const card = Progress.get(String(w.id || w.word));
+  const lv   = SM2.masteryLevel(card);
+  const ogCat = w.ogdenCategory ? OGDEN_CATEGORIES[w.ogdenCategory] : null;
+
+  document.getElementById('mWord').textContent = w.word;
+
+  // 单词朗读按钮
+  const speakWordBtn = document.getElementById('mSpeakWord');
+  speakWordBtn.onclick = () => Speech.speak(w.word, { rate: 0.8 });
+
+  // Meta
+  document.getElementById('mMeta').innerHTML = `
+    <span style="font-size:14px;color:var(--text-2)">/&thinsp;${w.phonetic||w.word}&thinsp;/</span>
+    <span class="pos-tag">${w.pos||''}</span>
+    ${freqTagsHtml(w.frequency)}
+    <span style="font-size:12px;font-weight:600;color:${SM2.masteryColor(lv)};background:${SM2.masteryColor(lv)}22;padding:2px 10px;border-radius:100px">${SM2.masteryLabel(lv)}</span>
+    ${ogCat ? `<span class="badge" style="background:${ogCat.bg};color:${ogCat.color}">${ogCat.label}</span>` : ''}
+    ${card ? `<span style="font-size:12px;color:var(--text-3)">复习 ${card.totalReviews} 次 | 正确率 ${card.totalReviews?Math.round(card.correctReviews/card.totalReviews*100):0}%</span>` : ''}
+  `;
+
+  // 释义 + 例句
+  document.getElementById('mMeanings').innerHTML = (w.meanings||[]).map((m,i) => {
+    const def = m.definition||'';
+    let zh='', en='';
+    if (def.includes(' | ')) { [zh, en] = def.split(' | ',2).map(s=>s.trim()); }
+    else { zh = def; }
+
+    const exText  = m.example || '';
+    const speakId = `sp-ex-${i}`;
+
+    return `<div class="meaning-item" style="margin-bottom:16px">
+      ${zh ? `<div class="def-zh">${i>0?`<span style='font-size:11px;font-weight:600;color:var(--text-3);margin-right:5px'>${i+1}.</span>`:''}${zh}</div>` : ''}
+      ${en ? `<div class="def-en">${en}</div>` : ''}
+      ${exText ? `
+      <div class="example-box">
+        <span style="color:var(--primary);font-weight:700;margin-top:1px">»</span>
+        <span class="ex-text">${exText}</span>
+        <button class="speak-btn" id="${speakId}" title="朗读例句">🔊</button>
+      </div>` : ''}
+    </div>`;
+  }).join('');
+
+  // 绑定例句朗读按钮
+  (w.meanings||[]).forEach((m, i) => {
+    const btn = document.getElementById(`sp-ex-${i}`);
+    if (btn && m.example) {
+      attachSpeakBtn(btn, () => m.example);
+    }
+  });
+
+  // 同义词
+  const syns = w.synonyms||[];
+  document.getElementById('mSyns').innerHTML = syns.length
+    ? `<div style="font-size:12px;font-weight:600;color:var(--text-3);margin-bottom:6px">近义词</div>
+       <div style="display:flex;flex-wrap:wrap;gap:6px">${syns.map(s => `<span style="padding:3px 10px;background:var(--border-light);border-radius:4px;font-size:12px;cursor:pointer" onclick="Speech.speak('${s}')">${s} 🔊</span>`).join('')}</div>`
+    : '';
+
+  document.getElementById('wordModal').classList.add('open');
+}
+
+function closeModal() {
+  Speech.stop();
+  document.getElementById('wordModal').classList.remove('open');
+}
+</script>
+</body>
+</html>

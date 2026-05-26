@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>词汇学习 · 首页</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<nav class="navbar">
+  <a href="index.html" class="nav-brand">📚 词汇站</a>
+  <ul class="nav-menu">
+    <li><a href="index.html">🏠 首页</a></li>
+    <li><a href="browse.html">📖 浏览</a></li>
+    <li><a href="study.html">🎯 学习</a></li>
+    <li><a href="stats.html">📊 统计</a></li>
+  </ul>
+  <div class="corpus-switcher" style="margin-left:auto">
+    <button class="corpus-btn" data-corpus="lc3000">LC3000</button>
+    <button class="corpus-btn" data-corpus="ogden">Ogden 850</button>
+  </div>
+</nav>
+
+<div class="container">
+
+  <!-- Hero -->
+  <div style="text-align:center;padding:40px 0 32px">
+    <h1 style="font-size:34px;font-weight:800;margin-bottom:10px;background:linear-gradient(135deg,#2563eb,#7c3aed);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text"
+        id="heroTitle">Longman Communication 3000</h1>
+    <p style="color:var(--text-2);font-size:15px;margin-bottom:28px" id="heroDesc">掌握最高频的英语词汇，覆盖86%的日常英语表达</p>
+    <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap">
+      <a href="study.html" class="btn btn-primary btn-lg" id="heroStudyBtn">🎯 开始学习</a>
+      <a href="browse.html" class="btn btn-outline btn-lg">📖 浏览词库</a>
+    </div>
+  </div>
+
+  <!-- 统计卡片 -->
+  <div class="grid grid-4" style="margin-bottom:28px">
+    <div class="stat-card">
+      <div class="stat-icon" style="background:#eff6ff">📅</div>
+      <div><div class="stat-value" id="sDue">-</div><div class="stat-label">今日待复习</div></div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon" style="background:#d1fae5">✅</div>
+      <div><div class="stat-value" id="sToday">-</div><div class="stat-label">今日已学习</div></div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon" style="background:#fef3c7">🔥</div>
+      <div><div class="stat-value" id="sStreak">-</div><div class="stat-label">连续天数</div></div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon" style="background:#ede9fe">🏆</div>
+      <div><div class="stat-value" id="sMaster">-</div><div class="stat-label">已掌握</div></div>
+    </div>
+  </div>
+
+  <div class="grid grid-2" style="margin-bottom:28px">
+    <!-- 掌握进度 -->
+    <div class="card">
+      <div class="card-header"><span class="card-title">学习进度</span><span id="progText" style="font-size:13px;color:var(--text-2)"></span></div>
+      <div class="card-body">
+        <div class="progress" style="height:10px;margin-bottom:18px"><div class="progress-bar" id="progBar" style="width:0"></div></div>
+        <div id="masteryList"></div>
+      </div>
+    </div>
+    <!-- 今日计划 -->
+    <div class="card">
+      <div class="card-header"><span class="card-title">今日学习计划</span></div>
+      <div class="card-body" id="planList"></div>
+    </div>
+  </div>
+
+  <!-- 功能卡片 -->
+  <div class="grid grid-3">
+    <div class="card" style="cursor:pointer;transition:var(--transition)" onclick="location.href='study.html'" onmouseenter="this.style.transform='translateY(-3px)'" onmouseleave="this.style.transform=''">
+      <div class="card-body" style="text-align:center;padding:28px">
+        <div style="font-size:40px;margin-bottom:12px">🃏</div>
+        <div style="font-size:16px;font-weight:700;margin-bottom:6px">闪卡学习</div>
+        <div style="font-size:13px;color:var(--text-2)">SM-2 算法，科学安排复习时间</div>
+      </div>
+    </div>
+    <div class="card" style="cursor:pointer;transition:var(--transition)" onclick="location.href='browse.html'" onmouseenter="this.style.transform='translateY(-3px)'" onmouseleave="this.style.transform=''">
+      <div class="card-body" style="text-align:center;padding:28px">
+        <div style="font-size:40px;margin-bottom:12px">📖</div>
+        <div style="font-size:16px;font-weight:700;margin-bottom:6px">词库浏览</div>
+        <div style="font-size:13px;color:var(--text-2)">搜索、筛选、查看详情</div>
+      </div>
+    </div>
+    <div class="card" style="cursor:pointer;transition:var(--transition)" onclick="location.href='stats.html'" onmouseenter="this.style.transform='translateY(-3px)'" onmouseleave="this.style.transform=''">
+      <div class="card-body" style="text-align:center;padding:28px">
+        <div style="font-size:40px;margin-bottom:12px">📊</div>
+        <div style="font-size:16px;font-weight:700;margin-bottom:6px">学习统计</div>
+        <div style="font-size:13px;color:var(--text-2)">热力图、趋势、掌握分布</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div id="toast-container" class="toast-container"></div>
+<script src="ogden.js"></script>
+<script src="words.js"></script>
+<script src="utils.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const wl = getWordList();
+  const stats = Progress.stats(wl);
+  const streak = Streak.get();
+
+  // 更新 Hero 文字
+  if (ACTIVE_CORPUS === 'ogden') {
+    document.getElementById('heroTitle').textContent = "Ogden's Basic English 850";
+    document.getElementById('heroDesc').textContent = "850个核心词汇，构建简洁而强大的英语表达基础";
+  }
+
+  document.getElementById('sDue').textContent    = stats.due;
+  document.getElementById('sToday').textContent  = History.todayCount();
+  document.getElementById('sStreak').textContent = streak.count;
+  document.getElementById('sMaster').textContent = stats.master;
+
+  const pct = stats.total ? Math.round(stats.studied / stats.total * 100) : 0;
+  document.getElementById('progBar').style.width = pct + '%';
+  document.getElementById('progText').textContent = `${stats.studied} / ${stats.total}`;
+
+  // 掌握层级
+  const levels = [
+    { label:'未学习', count:stats.new,      color:'#94a3b8' },
+    { label:'学习中', count:stats.learning, color:'#f59e0b' },
+    { label:'初步掌握',count:stats.young,   color:'#60a5fa' },
+    { label:'较为熟悉',count:stats.mature,  color:'#a78bfa' },
+    { label:'已掌握', count:stats.master,   color:'#34d399' },
+  ];
+  document.getElementById('masteryList').innerHTML = levels.map(l => {
+    const w = stats.total ? Math.round(l.count / stats.total * 100) : 0;
+    return `<div style="display:flex;align-items:center;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border-light)">
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="width:8px;height:8px;border-radius:50%;background:${l.color};display:inline-block"></span>
+        <span style="font-size:13px;color:var(--text-2)">${l.label}</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px">
+        <div style="width:80px;height:5px;background:var(--border-light);border-radius:100px;overflow:hidden">
+          <div style="height:100%;width:${w}%;background:${l.color};border-radius:100px"></div>
+        </div>
+        <span style="font-size:13px;font-weight:500;min-width:24px;text-align:right">${l.count}</span>
+      </div>
+    </div>`;
+  }).join('');
+
+  // 今日计划
+  document.getElementById('planList').innerHTML = `
+    <div onclick="location.href='study.html?mode=due'" style="padding:13px 15px;border-radius:10px;background:#eff6ff;cursor:pointer;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between">
+      <div style="display:flex;align-items:center;gap:10px">
+        <span style="font-size:20px">🔄</span>
+        <div><div style="font-size:14px;font-weight:600;color:var(--primary)">复习到期单词</div><div style="font-size:12px;color:var(--primary);opacity:.8">${stats.due} 个待复习</div></div>
+      </div><span style="color:var(--primary)">→</span>
+    </div>
+    <div onclick="location.href='study.html?mode=new'" style="padding:13px 15px;border-radius:10px;background:#d1fae5;cursor:pointer;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between">
+      <div style="display:flex;align-items:center;gap:10px">
+        <span style="font-size:20px">✨</span>
+        <div><div style="font-size:14px;font-weight:600;color:var(--success)">学习新单词</div><div style="font-size:12px;color:var(--success);opacity:.8">${stats.new} 个新单词</div></div>
+      </div><span style="color:var(--success)">→</span>
+    </div>
+    <div onclick="location.href='study.html?mode=all'" style="padding:13px 15px;border-radius:10px;background:#fef3c7;cursor:pointer;display:flex;align-items:center;justify-content:space-between">
+      <div style="display:flex;align-items:center;gap:10px">
+        <span style="font-size:20px">📚</span>
+        <div><div style="font-size:14px;font-weight:600;color:var(--warning)">随机练习</div><div style="font-size:12px;color:var(--warning);opacity:.8">全部 ${stats.total} 个单词</div></div>
+      </div><span style="color:var(--warning)">→</span>
+    </div>`;
+
+  if (stats.due > 0) document.getElementById('heroStudyBtn').textContent = `🎯 开始复习 (${stats.due})`;
+});
+</script>
+</body>
+</html>

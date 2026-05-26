@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>学习统计</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<nav class="navbar">
+  <a href="index.html" class="nav-brand">📚 词汇站</a>
+  <ul class="nav-menu">
+    <li><a href="index.html">🏠 首页</a></li>
+    <li><a href="browse.html">📖 浏览</a></li>
+    <li><a href="study.html">🎯 学习</a></li>
+    <li><a href="stats.html">📊 统计</a></li>
+  </ul>
+  <div class="corpus-switcher" style="margin-left:auto">
+    <button class="corpus-btn" data-corpus="lc3000">LC3000</button>
+    <button class="corpus-btn" data-corpus="ogden">Ogden 850</button>
+  </div>
+</nav>
+
+<div class="container">
+  <div style="margin-bottom:22px">
+    <h1 style="font-size:24px;font-weight:800;margin-bottom:4px">学习统计</h1>
+    <p style="font-size:14px;color:var(--text-2)" id="statsDesc">追踪你的学习进度</p>
+  </div>
+
+  <!-- 顶部数字 -->
+  <div class="grid grid-4" style="margin-bottom:26px">
+    <div class="stat-card">
+      <div class="stat-icon" style="background:#fef3c7">🔥</div>
+      <div><div class="stat-value" id="stStreak">0</div><div class="stat-label">连续天数</div></div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon" style="background:#d1fae5">📝</div>
+      <div><div class="stat-value" id="stReviews">0</div><div class="stat-label">总复习次数</div></div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon" style="background:#eff6ff">🎯</div>
+      <div><div class="stat-value" id="stAcc">0%</div><div class="stat-label">平均正确率</div></div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon" style="background:#ede9fe">📅</div>
+      <div><div class="stat-value" id="stDays">0</div><div class="stat-label">累计学习天</div></div>
+    </div>
+  </div>
+
+  <div class="grid grid-2" style="margin-bottom:26px">
+    <!-- 掌握分布 -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">词汇掌握分布</span>
+        <span id="progPct" style="font-size:13px;color:var(--primary);font-weight:600"></span>
+      </div>
+      <div class="card-body">
+        <svg id="donutSvg" width="160" height="160" viewBox="0 0 160 160" style="display:block;margin:0 auto 16px"></svg>
+        <div id="masteryLegend"></div>
+      </div>
+    </div>
+    <!-- 近7天柱状图 -->
+    <div class="card">
+      <div class="card-header"><span class="card-title">近7天学习量</span></div>
+      <div class="card-body">
+        <div style="display:flex;align-items:flex-end;gap:6px;height:120px" id="barChart"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 热力图 -->
+  <div class="card" style="margin-bottom:26px">
+    <div class="card-header"><span class="card-title">近30天学习热力图</span></div>
+    <div class="card-body">
+      <div style="overflow-x:auto;padding-bottom:4px">
+        <div style="min-width:300px">
+          <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-bottom:4px" id="hmDays"></div>
+          <div class="heatmap" id="heatmap"></div>
+          <div style="display:flex;align-items:center;gap:6px;margin-top:10px;font-size:12px;color:var(--text-3)">
+            少
+            <div style="width:12px;height:12px;border-radius:3px;background:#e9ecef"></div>
+            <div style="width:12px;height:12px;border-radius:3px;background:#bfdbfe"></div>
+            <div style="width:12px;height:12px;border-radius:3px;background:#60a5fa"></div>
+            <div style="width:12px;height:12px;border-radius:3px;background:#2563eb"></div>
+            多
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Ogden 专属统计 -->
+  <div id="ogdenStatsPanel" style="display:none;margin-bottom:26px">
+    <div class="card">
+      <div class="card-header"><span class="card-title">Ogden 分类掌握情况</span></div>
+      <div class="card-body" id="ogdenCatStats"></div>
+    </div>
+  </div>
+
+  <!-- 危险操作 -->
+  <div class="card" style="border-color:#fca5a5">
+    <div class="card-body" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
+      <div>
+        <div style="font-weight:600;color:var(--danger);margin-bottom:4px">⚠️ 重置学习数据</div>
+        <div style="font-size:13px;color:var(--text-2)">清除当前词库的所有学习记录，此操作不可撤销</div>
+      </div>
+      <button class="btn btn-sm" style="background:#fee2e2;color:var(--danger)" onclick="resetData()">重置数据</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast-container" class="toast-container"></div>
+<script src="ogden.js"></script>
+<script src="words.js"></script>
+<script src="utils.js"></script>
+<script>
+function renderAll() {
+  const wl     = getWordList();
+  const stats  = Progress.stats(wl);
+  const streak = Streak.get();
+  const hist   = History.all();
+  const prg    = Progress.all();
+
+  document.getElementById('statsDesc').textContent =
+    ACTIVE_CORPUS === 'ogden' ? "Ogden 850 学习进度追踪" : "LC3000 学习进度追踪";
+
+  document.getElementById('stStreak').textContent  = streak.count;
+  document.getElementById('stDays').textContent    = hist.length;
+
+  const totalRev = Object.values(prg).reduce((s,c)=>s+(c.totalReviews||0),0);
+  const totalOk  = Object.values(prg).reduce((s,c)=>s+(c.correctReviews||0),0);
+  document.getElementById('stReviews').textContent = totalRev;
+  document.getElementById('stAcc').textContent     = totalRev ? Math.round(totalOk/totalRev*100)+'%' : '—';
+
+  const pct = stats.total ? Math.round(stats.studied/stats.total*100) : 0;
+  document.getElementById('progPct').textContent = pct+'% 已接触';
+
+  drawDonut(stats);
+  drawBar();
+  drawHeatmap();
+
+  // Ogden 专属统计
+  if (ACTIVE_CORPUS === 'ogden') {
+    document.getElementById('ogdenStatsPanel').style.display = '';
+    const cats = ['operations','things','qualities'];
+    document.getElementById('ogdenCatStats').innerHTML = cats.map(cat => {
+      const words = wl.filter(w => w.ogdenCategory === cat);
+      const known = words.filter(w => SM2.masteryLevel(prg[String(w.id||w.word)]) >= 3).length;
+      const pct   = words.length ? Math.round(known/words.length*100) : 0;
+      const info  = OGDEN_CATEGORIES[cat];
+      return `<div style="margin-bottom:14px">
+        <div style="display:flex;justify-content:space-between;margin-bottom:6px">
+          <span style="font-size:13px;font-weight:600;color:${info.color}">${info.label} (${info.labelZh})</span>
+          <span style="font-size:13px;color:var(--text-2)">${known} / ${words.length}</span>
+        </div>
+        <div class="progress"><div class="progress-bar" style="width:${pct}%;background:${info.color}"></div></div>
+        <div style="font-size:12px;color:var(--text-3);margin-top:4px">${info.desc}</div>
+      </div>`;
+    }).join('');
+  }
+}
+
+function drawDonut(stats) {
+  const levels = [
+    {label:'未学习', n:stats.new,     c:'#e2e8f0'},
+    {label:'学习中', n:stats.learning,c:'#f59e0b'},
+    {label:'初步掌握',n:stats.young,  c:'#60a5fa'},
+    {label:'较为熟悉',n:stats.mature, c:'#a78bfa'},
+    {label:'已掌握', n:stats.master,  c:'#34d399'},
+  ];
+  const cx=80,cy=80,R=65,r=44,total=stats.total||1;
+  let ang = -Math.PI/2, paths = '';
+  levels.forEach(lv => {
+    if (!lv.n) return;
+    const da=lv.n/total*Math.PI*2,ea=ang+da,la=da>Math.PI?1:0;
+    const x1=cx+R*Math.cos(ang),y1=cy+R*Math.sin(ang),x2=cx+R*Math.cos(ea),y2=cy+R*Math.sin(ea);
+    const ix1=cx+r*Math.cos(ea),iy1=cy+r*Math.sin(ea),ix2=cx+r*Math.cos(ang),iy2=cy+r*Math.sin(ang);
+    paths += `<path d="M${x1} ${y1} A${R} ${R} 0 ${la} 1 ${x2} ${y2} L${ix1} ${iy1} A${r} ${r} 0 ${la} 0 ${ix2} ${iy2}Z" fill="${lv.c}" opacity=".9"/>`;
+    ang = ea;
+  });
+  document.getElementById('donutSvg').innerHTML = `
+    ${paths}
+    <circle cx="${cx}" cy="${cy}" r="${r-5}" fill="white"/>
+    <text x="${cx}" y="${cy-6}"  text-anchor="middle" font-size="24" font-weight="800" fill="#0f172a">${stats.studied}</text>
+    <text x="${cx}" y="${cy+12}" text-anchor="middle" font-size="12" fill="#64748b">已接触</text>
+    <text x="${cx}" y="${cy+28}" text-anchor="middle" font-size="11" fill="#94a3b8">/ ${stats.total}</text>`;
+
+  document.getElementById('masteryLegend').innerHTML = levels.map(lv => {
+    const w = stats.total ? Math.round(lv.n/stats.total*100) : 0;
+    return `<div style="display:flex;align-items:center;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border-light)">
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="width:10px;height:10px;border-radius:3px;background:${lv.c}"></span>
+        <span style="font-size:13px;color:var(--text-2)">${lv.label}</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <div style="width:70px;height:5px;background:var(--border-light);border-radius:100px;overflow:hidden">
+          <div style="height:100%;width:${w}%;background:${lv.c};border-radius:100px"></div>
+        </div>
+        <span style="font-size:13px;font-weight:500;min-width:22px;text-align:right">${lv.n}</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function drawBar() {
+  const data = History.last(7);
+  const maxN = Math.max(...data.map(d=>d.wordsStudied), 1);
+  document.getElementById('barChart').innerHTML = data.map(d => {
+    const h   = d.wordsStudied ? Math.max(6, Math.round(d.wordsStudied/maxN*100)) : 2;
+    const dt  = new Date(d.date); const lb = (dt.getMonth()+1)+'/'+ dt.getDate();
+    return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end">
+      <div style="font-size:10px;color:var(--text-3);margin-bottom:3px">${d.wordsStudied||''}</div>
+      <div style="width:100%;min-height:2px;height:${h}%;background:var(--primary);border-radius:4px 4px 0 0;opacity:.75;transition:opacity .2s" onmouseenter="this.style.opacity=1" onmouseleave="this.style.opacity=.75"></div>
+      <div style="font-size:10px;color:var(--text-3);margin-top:5px;white-space:nowrap">${lb}</div>
+    </div>`;
+  }).join('');
+}
+
+function drawHeatmap() {
+  const data  = History.last(30);
+  const days  = ['日','一','二','三','四','五','六'];
+  document.getElementById('hmDays').innerHTML =
+    days.map(d=>`<div style="text-align:center;font-size:11px;color:var(--text-3)">${d}</div>`).join('');
+
+  const maxN   = Math.max(...data.map(d=>d.wordsStudied), 1);
+  const first  = new Date(data[0].date);
+  const dow    = first.getDay();
+  const colors = ['#e9ecef','#bfdbfe','#93c5fd','#60a5fa','#2563eb'];
+  let html = '';
+  for (let i=0;i<dow;i++) html += '<div></div>';
+  data.forEach(d => {
+    const lv  = d.wordsStudied===0 ? 0 : Math.min(4, Math.ceil(d.wordsStudied/maxN*4));
+    const tip = `${d.date.slice(5)}: ${d.wordsStudied}词`;
+    html += `<div class="hm-cell" style="background:${colors[lv]}" title="${tip}"></div>`;
+  });
+  document.getElementById('heatmap').innerHTML = html;
+}
+
+function resetData() {
+  if (!confirm('确认清除所有学习数据？此操作不可撤销！')) return;
+  [KEYS.PROGRESS(CK()), KEYS.HISTORY(CK()), KEYS.STREAK(CK())].forEach(k => localStorage.removeItem(k));
+  UI.toast('学习数据已重置','success');
+  renderAll();
+}
+
+renderAll();
+</script>
+</body>
+</html>

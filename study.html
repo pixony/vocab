@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>闪卡学习</title>
+<link rel="stylesheet" href="style.css">
+<style>
+.mode-card {
+  padding: 22px 16px; border-radius: var(--radius); border: 2px solid var(--border);
+  cursor: pointer; text-align: center; background: #fff; transition: var(--transition);
+}
+.mode-card:hover,.mode-card.sel { border-color: var(--primary); background: var(--primary-light); }
+.mode-card .mi { font-size: 34px; margin-bottom: 10px; }
+.mode-card .mt { font-size: 14px; font-weight: 700; margin-bottom: 4px; }
+.mode-card .md { font-size: 12px; color: var(--text-2); }
+.study-prog {
+  display: flex; align-items: center; gap: 14px; margin-bottom: 18px;
+}
+.score-row { display: flex; justify-content: center; gap: 20px; font-size: 13px; margin-bottom: 16px; }
+.key-hints { display: flex; justify-content: center; gap: 16px; flex-wrap: wrap; }
+.kh { font-size: 12px; color: var(--text-3); display: flex; align-items: center; gap: 5px; }
+.kb { padding: 2px 7px; border: 1px solid var(--border); border-radius: 4px; font-size: 11px; font-family: monospace; background: #fff; }
+.done-stats { display: grid; grid-template-columns: repeat(3,1fr); gap: 14px; margin-bottom: 26px; }
+.ds { padding: 18px; background: var(--bg); border-radius: var(--radius-sm); text-align: center; }
+.ds .dv { font-size: 30px; font-weight: 800; }
+.ds .dl { font-size: 13px; color: var(--text-2); margin-top: 4px; }
+</style>
+</head>
+<body>
+
+<nav class="navbar">
+  <a href="index.html" class="nav-brand">📚 词汇站</a>
+  <ul class="nav-menu">
+    <li><a href="index.html">🏠 首页</a></li>
+    <li><a href="browse.html">📖 浏览</a></li>
+    <li><a href="study.html">🎯 学习</a></li>
+    <li><a href="stats.html">📊 统计</a></li>
+  </ul>
+  <div class="corpus-switcher" style="margin-left:auto">
+    <button class="corpus-btn" data-corpus="lc3000">LC3000</button>
+    <button class="corpus-btn" data-corpus="ogden">Ogden 850</button>
+  </div>
+</nav>
+
+<div class="container" style="max-width:700px">
+
+  <!-- ① 模式选择 -->
+  <div id="screenMode">
+    <div style="margin-bottom:22px">
+      <h1 style="font-size:24px;font-weight:800;margin-bottom:4px">背单词</h1>
+      <p style="font-size:14px;color:var(--text-2)">选择学习模式，开始今天的练习</p>
+    </div>
+    <div class="card" style="margin-bottom:18px">
+      <div class="card-body">
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:18px">
+          <div class="mode-card sel" data-mode="due" onclick="selMode('due',this)">
+            <div class="mi">🔄</div><div class="mt">到期复习</div>
+            <div class="md">今日到期单词</div>
+            <div style="margin-top:10px" id="badgeDue"></div>
+          </div>
+          <div class="mode-card" data-mode="new" onclick="selMode('new',this)">
+            <div class="mi">✨</div><div class="mt">学习新词</div>
+            <div class="md">从未学过的单词</div>
+            <div style="margin-top:10px" id="badgeNew"></div>
+          </div>
+          <div class="mode-card" data-mode="all" onclick="selMode('all',this)">
+            <div class="mi">📚</div><div class="mt">随机练习</div>
+            <div class="md">全部词库</div>
+            <div style="margin-top:10px" id="badgeAll"></div>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;justify-content:center;margin-bottom:18px">
+          <span style="font-size:14px;color:var(--text-2)">每次学习</span>
+          <input type="number" class="input" id="batchN" value="20" min="5" max="100" style="width:80px;text-align:center;font-size:17px;font-weight:700">
+          <span style="font-size:14px;color:var(--text-2)">个单词</span>
+        </div>
+        <!-- 语音设置 -->
+        <div style="display:flex;align-items:center;gap:14px;justify-content:center;padding:12px;background:var(--bg);border-radius:var(--radius-sm);margin-bottom:18px">
+          <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
+            <input type="checkbox" id="autoSpeakWord" checked> 翻转时朗读单词
+          </label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
+            <input type="checkbox" id="autoSpeakEx"> 显示例句时朗读
+          </label>
+        </div>
+        <div style="text-align:center">
+          <button class="btn btn-primary btn-lg" onclick="startStudy()">🎯 开始学习</button>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header"><span class="card-title">当前词库状态</span></div>
+      <div class="card-body" id="queueInfo"></div>
+    </div>
+  </div>
+
+  <!-- ② 学习中 -->
+  <div id="screenStudy" style="display:none">
+    <div class="study-prog">
+      <button class="btn btn-ghost btn-sm" onclick="exitStudy()">← 退出</button>
+      <div class="progress" style="flex:1"><div class="progress-bar" id="spFill" style="width:0"></div></div>
+      <span id="spText" style="font-size:13px;color:var(--text-2);white-space:nowrap">0/0</span>
+    </div>
+
+    <div class="score-row">
+      <span style="color:#dc2626">❌ <span id="cntAgain">0</span></span>
+      <span style="color:#d97706">😓 <span id="cntHard">0</span></span>
+      <span style="color:#059669">✅ <span id="cntGood">0</span></span>
+      <span style="color:#7c3aed">⚡ <span id="cntEasy">0</span></span>
+    </div>
+
+    <!-- 闪卡 -->
+    <div class="flashcard-wrap" id="cardWrap" onclick="flip()">
+      <div class="flashcard" id="flashCard">
+        <!-- 正面 -->
+        <div class="card-face card-front">
+          <div id="frontTags" style="position:absolute;top:16px;right:16px;display:flex;flex-wrap:wrap;gap:4px;justify-content:flex-end"></div>
+          <div class="cf-word" id="cfWord">word</div>
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
+            <div class="cf-phon" id="cfPhon">/phonetic/</div>
+            <button class="speak-btn" id="speakFront" title="朗读单词">🔊</button>
+          </div>
+          <!-- Ogden 分类标识 -->
+          <div id="cfOgdenBadge"></div>
+          <div class="cf-hint" style="margin-top:16px">点击卡片翻转 · 空格键</div>
+        </div>
+        <!-- 背面 -->
+        <div class="card-face card-back">
+          <div class="cb-body" id="cbBody"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 评分 -->
+    <div id="ratingArea" style="display:none">
+      <p style="text-align:center;font-size:13px;color:var(--text-2);margin-bottom:14px">你记住了吗？</p>
+      <div class="rating-grid">
+        <button class="r-btn r-again" onclick="rate(0)"><span class="rl">❌</span><span class="ri">不会</span><span class="ri" id="iv0"></span></button>
+        <button class="r-btn r-hard"  onclick="rate(1)"><span class="rl">😓</span><span class="ri">较难</span><span class="ri" id="iv1"></span></button>
+        <button class="r-btn r-good"  onclick="rate(2)"><span class="rl">✅</span><span class="ri">记得</span><span class="ri" id="iv2"></span></button>
+        <button class="r-btn r-easy"  onclick="rate(3)"><span class="rl">⚡</span><span class="ri">很熟</span><span class="ri" id="iv3"></span></button>
+      </div>
+      <div class="key-hints">
+        <span class="kh"><span class="kb">1</span>不会</span>
+        <span class="kh"><span class="kb">2</span>较难</span>
+        <span class="kh"><span class="kb">3</span>记得</span>
+        <span class="kh"><span class="kb">4</span>很熟</span>
+        <span class="kh"><span class="kb">Space</span>翻转</span>
+      </div>
+    </div>
+    <div id="flipHint" style="text-align:center;color:var(--text-3);font-size:13px;margin-top:8px">点击卡片或按空格键翻转</div>
+  </div>
+
+  <!-- ③ 完成 -->
+  <div id="screenDone" style="display:none">
+    <div class="card">
+      <div class="card-body" style="text-align:center;padding:36px 20px">
+        <div style="font-size:64px;margin-bottom:14px" id="dIcon">🎉</div>
+        <div style="font-size:26px;font-weight:800;margin-bottom:6px" id="dTitle">本轮完成！</div>
+        <div style="font-size:15px;color:var(--text-2);margin-bottom:26px" id="dSub"></div>
+        <div class="done-stats">
+          <div class="ds"><div class="dv" style="color:var(--primary)" id="dTotal">0</div><div class="dl">学习单词</div></div>
+          <div class="ds"><div class="dv" style="color:var(--success)" id="dOk">0</div><div class="dl">记住了</div></div>
+          <div class="ds"><div class="dv" id="dAcc">0%</div><div class="dl">正确率</div></div>
+        </div>
+        <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap">
+          <button class="btn btn-primary" onclick="startStudy()">🔄 再来一轮</button>
+          <a href="stats.html" class="btn btn-outline">📊 查看统计</a>
+          <a href="index.html" class="btn btn-ghost">🏠 首页</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div id="toast-container" class="toast-container"></div>
+<script src="ogden.js"></script>
+<script src="words.js"></script>
+<script src="utils.js"></script>
+<script>
+let mode = 'due', queue = [], idx = 0, flipped = false;
+let sc = { again:0, hard:0, good:0, easy:0 };
+
+function selMode(m, el) {
+  mode = m;
+  document.querySelectorAll('.mode-card').forEach(c => c.classList.remove('sel'));
+  el.classList.add('sel');
+}
+
+function initMode() {
+  const wl    = getWordList();
+  const stats = Progress.stats(wl);
+  document.getElementById('badgeDue').innerHTML = `<span class="badge badge-primary">${stats.due} 词</span>`;
+  document.getElementById('badgeNew').innerHTML = `<span class="badge badge-success">${stats.new} 词</span>`;
+  document.getElementById('badgeAll').innerHTML = `<span class="badge badge-gray">${stats.total} 词</span>`;
+
+  document.getElementById('queueInfo').innerHTML = `
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px">
+      <div style="text-align:center;padding:14px;background:var(--bg);border-radius:var(--radius-sm)">
+        <div style="font-size:26px;font-weight:800;color:var(--primary)">${stats.due}</div>
+        <div style="font-size:13px;color:var(--text-2);margin-top:4px">待复习</div>
+      </div>
+      <div style="text-align:center;padding:14px;background:var(--bg);border-radius:var(--radius-sm)">
+        <div style="font-size:26px;font-weight:800;color:var(--success)">${stats.new}</div>
+        <div style="font-size:13px;color:var(--text-2);margin-top:4px">新单词</div>
+      </div>
+      <div style="text-align:center;padding:14px;background:var(--bg);border-radius:var(--radius-sm)">
+        <div style="font-size:26px;font-weight:800;color:var(--secondary)">${stats.master}</div>
+        <div style="font-size:13px;color:var(--text-2);margin-top:4px">已掌握</div>
+      </div>
+    </div>`;
+}
+
+function startStudy() {
+  const n   = Math.max(1, parseInt(document.getElementById('batchN').value) || 20);
+  const wl  = getWordList();
+  const prg = Progress.all();
+  let pool;
+
+  if (mode === 'due') {
+    pool = wl.filter(w => SM2.isDue(prg[String(w.id||w.word)]));
+    pool.sort((a,b) => (prg[String(a.id||a.word)]?.nextReview||0) - (prg[String(b.id||b.word)]?.nextReview||0));
+  } else if (mode === 'new') {
+    pool = wl.filter(w => !prg[String(w.id||w.word)]);
+  } else {
+    pool = [...wl].sort(() => Math.random()-.5);
+  }
+
+  if (!pool.length) { UI.toast('当前模式没有单词可以学习 😊','success'); return; }
+  queue = pool.slice(0,n);
+  idx   = 0;
+  sc    = { again:0, hard:0, good:0, easy:0 };
+  show('study');
+  showCard();
+}
+
+function showCard() {
+  if (idx >= queue.length) { finishSession(); return; }
+  const w = queue[idx];
+  flipped = false;
+  document.getElementById('flashCard').classList.remove('flipped');
+
+  document.getElementById('cfWord').textContent = w.word;
+  document.getElementById('cfPhon').textContent = w.phonetic ? '/'+w.phonetic+'/' : '';
+
+  // 频率标签
+  document.getElementById('frontTags').innerHTML = freqTagsHtml(w.frequency||'');
+
+  // Ogden 分类标识
+  const ogCat = w.ogdenCategory ? OGDEN_CATEGORIES[w.ogdenCategory] : null;
+  document.getElementById('cfOgdenBadge').innerHTML = ogCat
+    ? `<span class="badge" style="background:${ogCat.bg};color:${ogCat.color};font-size:12px">${ogCat.label}</span>` : '';
+
+  // 单词朗读按钮
+  const speakFront = document.getElementById('speakFront');
+  speakFront.onclick = (e) => { e.stopPropagation(); Speech.speak(w.word, { rate:0.8 }); };
+
+  // 背面内容
+  const defs = (w.meanings||[]).map((m,i) => {
+    const def = m.definition||'';
+    let zh='', en='';
+    if (def.includes(' | ')) { [zh, en] = def.split(' | ',2); }
+    else { zh = def; }
+    const speakId = `cb-sp-ex-${i}`;
+    return `<div style="margin-bottom:${i<(w.meanings||[]).length-1?'10px':'0'}">
+      <div class="cb-def">
+        ${(w.meanings||[]).length>1?`<span style='font-size:11px;font-weight:700;color:var(--text-3)'>${i+1}.</span> `:''}
+        ${zh ? `<span style="font-weight:700">${zh}</span>` : ''}
+        ${en ? `<span style="color:var(--text-2);font-size:12.5px;font-style:italic"> ${en}</span>` : ''}
+      </div>
+      ${m.example ? `
+      <div class="cb-ex">
+        <span style="color:var(--primary);font-weight:700;flex-shrink:0">»</span>
+        <span class="ex-text" style="flex:1">${m.example}</span>
+        <button class="speak-btn" id="${speakId}" title="朗读例句" style="flex-shrink:0">🔊</button>
+      </div>` : ''}
+    </div>`;
+  }).join('');
+
+  const synHtml = (w.synonyms||[]).length
+    ? `<div style="margin-top:10px;padding-top:8px;border-top:1px dashed var(--border);font-size:12px;color:var(--text-3)">
+        ≈ ${w.synonyms.slice(0,6).map(s=>`<span style='cursor:pointer' onclick='Speech.speak("${s}")'>${s}</span>`).join('  ')}
+       </div>` : '';
+
+  document.getElementById('cbBody').innerHTML = `
+    <div class="cb-word">${w.word}</div>
+    <div class="cb-phon">${w.phonetic ? '/'+w.phonetic+'/' : ''}</div>
+    ${defs}${synHtml}`;
+
+  // 绑定例句朗读
+  (w.meanings||[]).forEach((m,i) => {
+    const btn = document.getElementById(`cb-sp-ex-${i}`);
+    if (btn && m.example) attachSpeakBtn(btn, () => m.example);
+  });
+
+  // 预览下次间隔
+  const card = Progress.get(String(w.id||w.word)) || SM2.create(String(w.id||w.word));
+  [0,1,2,3].forEach(q => {
+    const nxt = SM2.review(card, q);
+    const labels = ['重学','明天',`${nxt.interval}天后`,`${nxt.interval}天后`];
+    document.getElementById(`iv${q}`).textContent = fmtNextReview(nxt.nextReview);
+  });
+
+  document.getElementById('ratingArea').style.display = 'none';
+  document.getElementById('flipHint').style.display   = 'block';
+
+  document.getElementById('spFill').style.width  = (idx/queue.length*100)+'%';
+  document.getElementById('spText').textContent  = `${idx}/${queue.length}`;
+
+  // 自动朗读单词
+  if (document.getElementById('autoSpeakWord')?.checked) {
+    setTimeout(() => Speech.speak(w.word, { rate:0.8 }), 300);
+  }
+}
+
+function flip() {
+  if (flipped) return;
+  flipped = true;
+  document.getElementById('flashCard').classList.add('flipped');
+  document.getElementById('ratingArea').style.display = 'block';
+  document.getElementById('flipHint').style.display   = 'none';
+
+  // 自动朗读例句
+  const w = queue[idx];
+  if (document.getElementById('autoSpeakEx')?.checked && w?.meanings?.[0]?.example) {
+    setTimeout(() => Speech.speak(w.meanings[0].example, { rate:0.85 }), 800);
+  }
+}
+
+function rate(q) {
+  const w    = queue[idx];
+  const wid  = String(w.id||w.word);
+  const card = Progress.get(wid) || SM2.create(wid);
+  Progress.save(SM2.review(card, q));
+  const keys = ['again','hard','good','easy'];
+  sc[keys[q]]++;
+  document.getElementById(`cnt${keys[q].charAt(0).toUpperCase()+keys[q].slice(1)}`).textContent = sc[keys[q]];
+  Speech.stop();
+  idx++;
+  showCard();
+}
+
+function finishSession() {
+  const total   = sc.again + sc.hard + sc.good + sc.easy;
+  const correct = sc.good + sc.easy;
+  const acc     = total ? Math.round(correct/total*100) : 0;
+  History.add({ wordsStudied:total, correctCount:correct });
+  Streak.update();
+
+  document.getElementById('dTotal').textContent = total;
+  document.getElementById('dOk').textContent    = correct;
+  document.getElementById('dAcc').textContent   = acc+'%';
+
+  const [icon,title,sub] = acc>=90 ? ['🏆','太棒了！','你的记忆力令人钦佩！']
+    : acc>=70 ? ['🎉','干得好！','继续保持，越来越棒！']
+    : acc>=50 ? ['💪','加油！','多复习几次就能掌握！']
+    : ['📖','继续努力！','重复是记忆的关键！'];
+  document.getElementById('dIcon').textContent  = icon;
+  document.getElementById('dTitle').textContent = title;
+  document.getElementById('dSub').textContent   = sub;
+  show('done');
+}
+
+function exitStudy() {
+  if (sc.again+sc.hard+sc.good+sc.easy > 0) {
+    History.add({ wordsStudied: sc.again+sc.hard+sc.good+sc.easy, correctCount: sc.good+sc.easy });
+  }
+  Speech.stop();
+  show('mode');
+  initMode();
+}
+
+function show(s) {
+  ['mode','study','done'].forEach(n =>
+    document.getElementById('screen'+n.charAt(0).toUpperCase()+n.slice(1)).style.display = n===s?'':'none'
+  );
+}
+
+// 键盘快捷键
+document.addEventListener('keydown', e => {
+  if (document.getElementById('screenStudy').style.display === 'none') return;
+  if (e.code === 'Space') { e.preventDefault(); if (!flipped) flip(); }
+  if (flipped) {
+    if (e.code==='Digit1') rate(0);
+    if (e.code==='Digit2') rate(1);
+    if (e.code==='Digit3') rate(2);
+    if (e.code==='Digit4') rate(3);
+  }
+});
+
+// URL 参数
+const urlP = new URLSearchParams(location.search);
+const urlMode = urlP.get('mode');
+const urlWord = urlP.get('word');
+
+document.addEventListener('DOMContentLoaded', () => {
+  initMode();
+  if (urlMode) {
+    mode = urlMode;
+    document.querySelectorAll('.mode-card').forEach(c =>
+      c.classList.toggle('sel', c.dataset.mode === urlMode)
+    );
+  }
+  if (urlWord) {
+    const wl  = getWordList();
+    const found = wl.find(w => w.word.toLowerCase() === urlWord.toLowerCase());
+    if (found) { queue=[found]; idx=0; sc={again:0,hard:0,good:0,easy:0}; show('study'); showCard(); }
+  }
+});
+</script>
+</body>
+</html>
